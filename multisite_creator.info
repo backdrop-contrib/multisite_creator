@@ -1,0 +1,19 @@
+name = Multisite Creator
+description = Creates new Backdrop websites automatically
+package = Site Administration
+type = module
+backdrop = 1.x
+version = 1.x-1.0
+
+configure = admin/config/system/multisite-creator
+
+dependencies[] = system
+dependencies[] = user
+
+; Module PHP files
+files[] = multisite_creator.module
+files[] = multisite_creator.admin.inc
+files[] = multisite_creator.install.inc
+files[] = multisite_creator.ssl.inc
+files[] = multisite_creator.mail.inc
+files[] = multisite_creator.cron.inc

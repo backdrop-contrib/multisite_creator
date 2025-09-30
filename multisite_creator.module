@@ -1,0 +1,563 @@
+<?php
+
+/**
+ * @file
+ * Module to create new Backdrop multisite sites automatically.
+ */
+
+require_once(__DIR__ . '/multisite_creator.admin.inc');
+require_once(__DIR__ . '/multisite_creator.cron.inc');
+require_once(__DIR__ . '/multisite_creator.install.inc');
+require_once(__DIR__ . '/multisite_creator.mail.inc');
+require_once(__DIR__ . '/multisite_creator.ssl.inc');
+
+/**
+ * Implements hook_menu().
+ */
+function multisite_creator_menu() {
+  $items = array();
+
+  $items['admin/config/system/multisite-creator'] = array(
+    'title' => t('Multisite Creator'),
+    'description' => t('Create new Backdrop websites automatically'),
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('multisite_creator_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'multisite_creator.admin.inc',
+  );
+
+  // ADD this new entry:
+  $items['admin/config/system/multisite-creator/create'] = array(
+    'title' => t('Create new site'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  // ADD this new entry:
+  $items['admin/config/system/multisite-creator/manage'] = array(
+    'title' => t('Manage sites'),
+    'description' => t('View and manage created multisite sites'),
+    'page callback' => 'multisite_creator_manage_sites_page',
+    'access arguments' => array('administer site configuration'),
+    'file' => 'multisite_creator.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -5,
+  );
+
+  $items['admin/config/system/multisite-creator/settings'] = array(
+    'title' => t('Creator Configuration'),
+    'description' => t('Configure multisite creator parameters'),
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('multisite_creator_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'multisite_creator.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10, // Change weight to order it at the end
+  );
+
+  // ADD this new entry:
+  $items['admin/config/system/multisite-creator/delete/%'] = array(
+    'title' => t('Delete site'),
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('multisite_creator_delete_form', 5),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'multisite_creator.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function multisite_creator_permission() {
+  return array(
+    'create multisites' => array(
+      'title' => t('Create multisites'),
+      'description' => t('Allows creating new multisite websites'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Creates a new multisite site.
+ *
+ * @param array $site_data
+ *   Array with new site data:
+ *   - name: Site name
+ *   - machine_name: Site machine name
+ *   - profile: install profile
+ *   - user1_email: Administrator email
+ *   - user1_name: Administrator username
+ *   - user1_pass: Administrator password
+ *   - extra_fields: array()
+ *
+ * @return bool|string
+ *   TRUE if created successfully, string with error if there are problems.
+ */
+function multisite_creator_create_site($site_data) {
+  $config = config('multisite_creator.settings');
+  $debug = $config->get('debug');
+  $site_url = multisite_creator_get_site_url($site_data['machine_name']);
+
+  try {
+    // 1. Create site directory
+    if (!multisite_creator_create_site_directory($site_data['machine_name'])) {
+      throw new Exception('Could not create site directory');
+    }
+
+    // 2. Create settings.php file
+    if (!multisite_creator_create_settings_file($site_data)) {
+      throw new Exception('Could not create settings.php file');
+    }
+
+    // 2. Update sites.php
+    if (!multisite_creator_update_sites_php($site_data['machine_name'])) {
+      throw new Exception('Could not update sites.php');
+    }
+
+    // 3. Create database
+    if (!multisite_creator_prepare_database($site_data['machine_name'])) {
+      throw new Exception('Could not prepare database');
+    }
+
+    // 4. Create Apache configuration
+    if (!multisite_creator_create_apache_config($site_data['machine_name'])) {
+      throw new Exception('Could not create Apache configuration');
+    }
+
+    // 6. Install Backdrop
+    if (!multisite_creator_install_backdrop($site_data)) {
+      throw new Exception('Could not install Backdrop');
+    }
+
+    // 7. Create SSL certificate with Let's Encrypt (if enabled)
+    $ssl_enabled = $config->get('ssl_enabled');
+    if ($ssl_enabled) {
+      $ssl_result = multisite_creator_add_ssl_certificate($site_data['machine_name']);
+      if ($ssl_result !== TRUE) {
+        if ($debug) {
+          // Don't fail completely for SSL, just warn
+          watchdog(
+            'multisite_creator',
+            'Warning: Could not create SSL certificate for @site: @error',
+            array('@site' => $site_data['name'], '@error' => $ssl_result),
+            WATCHDOG_WARNING
+          );
+        }
+      }
+    }
+
+    // 8. Send email notification
+    $email_notifications = $config->get('email_notifications');
+    if ($email_notifications) {
+      multisite_creator_send_creation_notification($site_data, $site_url);
+    }
+
+    // 9. reload apache if not created through cron
+    if (!multisite_creator_check_lock_status()) {
+      multisite_creator_reload_apache();
+    }
+
+    // Log the operation
+    watchdog(
+      'multisite_creator',
+      'New site created: @site (@url)',
+      array('@site' => $site_data['name'], '@url' => $site_url)
+    );
+
+    return TRUE;
+  } catch (Exception $e) {
+    // Cleanup on error
+    multisite_creator_cleanup_failed_site($site_data['machine_name']);
+
+    // Send error notification if enabled
+    $email_notifications = $config->get('email_notifications');
+    if ($email_notifications) {
+      multisite_creator_send_error_notification($site_data, $e->getMessage());
+    }
+
+    if ($debug) {
+      watchdog(
+        'multisite_creator',
+        'Error creating site @site: @error',
+        array('@site' => $site_data['name'], '@error' => $e->getMessage()),
+        WATCHDOG_ERROR
+      );
+    }
+
+    return $e->getMessage();
+  }
+}
+
+/**
+ * Generates a machine name from a name.
+ */
+function multisite_creator_generate_machine_name($name) {
+  $machine_name = strtolower($name);
+  $machine_name = preg_replace('/[^a-z0-9_]/', '_', $machine_name);
+  $machine_name = preg_replace('/_{2,}/', '_', $machine_name);
+  $machine_name = trim($machine_name, '_');
+
+  // Add timestamp if already exists
+  if (multisite_creator_site_exists($machine_name)) {
+    $machine_name .= '_' . time();
+  }
+
+  return $machine_name;
+}
+
+/**
+ * Checks if a site already exists.
+ */
+function multisite_creator_site_exists($machine_name, $show_form_error = TRUE) {
+  $sites_dir = BACKDROP_ROOT . '/sites/' . $machine_name;
+  $dir_exists = is_dir($sites_dir);
+
+  // Check if already in queue
+  $pattern = '%' . db_like('"machine_name";s:' . strlen($machine_name) . ':"' . $machine_name . '"') . '%';
+  $query = db_select('multisite_creator_queue', 'q');
+  $query->condition('site_data', $pattern, 'LIKE');
+  $query->condition('status', array('pending', 'processing'), 'IN');
+  $in_queue = $query->countQuery()->execute()->fetchField();
+
+  $exists = $dir_exists || $in_queue;
+
+  if ($exists && $show_form_error) {
+    if ($dir_exists) {
+      form_set_error('machine_name', t(
+        'Subdomain "@name" is already in use. It must be unique.',
+        array('@name' => $machine_name)
+      ));
+    } elseif ($in_queue) {
+      form_set_error('machine_name', t(
+        'Subdomain "@name" is already in the creation queue. Choose a different subdomain.',
+        array('@name' => $machine_name)
+      ));
+    }
+  }
+
+  return $exists;
+}
+
+/**
+ * Cleans up files from a site that failed during creation.
+ */
+function multisite_creator_cleanup_failed_site($machine_name) {
+  $config = config('multisite_creator.settings');
+  $sites_dir = BACKDROP_ROOT . '/sites/' . $machine_name;
+
+  // Remove site directory
+  if (is_dir($sites_dir)) {
+    multisite_creator_delete_directory($sites_dir);
+  }
+
+  // Remove Apache configuration
+  $apache_config_prefix = $config->get('apache_config_prefix');
+  $path = $config->get('apache_config_path');
+  $apache_config_prefix = $config->get('apache_config_prefix');
+  $apache_config = $path . '/' . $apache_config_prefix . $machine_name . '.conf';
+
+  if (file_exists($apache_config)) {
+    $command = $config->get('apache_dissite_command');
+    if (!empty($command)) {
+      exec($command . ' ' . escapeshellarg($apache_config_prefix . $machine_name . '.conf') . ' 2>/dev/null');
+    }
+    exec('sudo rm ' . escapeshellarg($apache_config));
+  }
+
+  // Remove apache logs files
+  multisite_creator_delete_log_directories($machine_name);
+
+  // Remove SSL configuration if it exists
+  if ($config->get('ssl_enabled')) {
+    multisite_creator_cleanup_ssl_certificate($machine_name);
+  }
+
+  // Remove database
+  multisite_creator_drop_database($machine_name);
+
+  // Remove from sites.php
+  multisite_creator_remove_from_sites_php($machine_name);
+
+  watchdog(
+    'multisite_creator',
+    'Cleanup completed for site @site',
+    array('@site' => $machine_name),
+    WATCHDOG_INFO
+  );
+}
+
+/**
+ * Deletes a directory and all its content.
+ */
+function multisite_creator_delete_directory($dir) {
+  if (!is_dir($dir)) {
+    return false;
+  }
+
+  $files = array_diff(scandir($dir), array('.', '..'));
+  foreach ($files as $file) {
+    $path = $dir . '/' . $file;
+    is_dir($path) ? multisite_creator_delete_directory($path) : unlink($path);
+  }
+
+  return rmdir($dir);
+}
+
+/**
+ * Completely deletes a multisite site.
+ */
+function multisite_creator_delete_site_completely($machine_name) {
+  $config = config('multisite_creator.settings');
+  $debug = $config->get('debug');
+  $apache_config_prefix = $config->get('apache_config_prefix');
+  $apache_config_path = $config->get('apache_config_path');
+
+  try {
+    $sites_dir = BACKDROP_ROOT . '/sites/' . $machine_name;
+
+    // 1. Remove site directory
+    if (is_dir($sites_dir)) {
+      multisite_creator_delete_directory($sites_dir);
+    }
+
+    // 2. Remove Apache configuration
+
+    $apache_config = $apache_config_path . '/' . $apache_config_prefix . $machine_name . '.conf';
+    $apache_config_ssl = $apache_config_path . '/' . $apache_config_prefix . $machine_name . '-le-ssl.conf';
+
+    if (file_exists($apache_config)) {
+      $command = $config->get('apache_dissite_command');
+      if (!empty($command)) {
+        exec($command . ' ' . escapeshellarg($apache_config_prefix . $machine_name . '.conf') . ' 2>/dev/null');
+      }
+      exec('sudo rm ' . escapeshellarg($apache_config));
+      if ($config->get('ssl_enabled')) {
+        if (!empty($command)) {
+          exec($command . ' ' . escapeshellarg($apache_config_prefix . $machine_name . '-le-ssl.conf') . ' 2>/dev/null');
+        }
+        exec('sudo rm ' . escapeshellarg($apache_config_ssl));
+      }
+    }
+    // Remove Apache lg files
+    multisite_creator_delete_log_directories($machine_name);
+
+    // Remove SSL configuration if it exists
+    if ($config->get('ssl_enabled')) {
+      multisite_creator_cleanup_ssl_certificate($machine_name);
+    }
+
+    // 3. Remove from sites.php
+    multisite_creator_remove_from_sites_php($machine_name);
+
+    // 4. Remove SSL certificate if it exists
+    $config = config('multisite_creator.settings');
+    if ($config->get('ssl_enabled', FALSE)) {
+      multisite_creator_cleanup_ssl_certificate($machine_name);
+    }
+
+    // 5. Remove database
+    multisite_creator_drop_database($machine_name);
+
+    // 6. Restart Apache
+    multisite_creator_reload_apache();
+
+    return TRUE;
+  } catch (Exception $e) {
+    if ($debug) {
+      watchdog(
+        'multisite_creator',
+        'Error deleting site @site: @error',
+        array('@site' => $machine_name, '@error' => $e->getMessage()),
+        WATCHDOG_ERROR
+      );
+    }
+    return FALSE;
+  }
+}
+
+/**
+ * Check if creation is in progress.
+ */
+function multisite_creator_is_creation_in_progress() {
+  return config_get('multisite_creator.lock', 'active');
+}
+
+/**
+ * Set creation lock.
+ */
+function multisite_creator_set_creation_lock() {
+  $config = config('multisite_creator.lock');
+  $config->set('active', TRUE);
+  $config->set('timestamp', time());
+  $config->save();
+}
+
+/**
+ * Release creation lock.
+ */
+function multisite_creator_release_creation_lock() {
+  $config = config('multisite_creator.lock');
+  $config->set('active', FALSE);
+  $config->clear('timestamp');
+  $config->save();
+}
+
+/**
+ * Check for stale locks.
+ */
+function multisite_creator_check_stale_lock() {
+  $config = config('multisite_creator.lock');
+  $lock_time = $config->get('timestamp');
+
+  if ($lock_time && (time() - $lock_time) > 600) { // 10 minutes
+    multisite_creator_release_creation_lock();
+    watchdog('multisite_creator', 'Released stale lock older than 10 minutes');
+  }
+}
+
+/**
+ * Check for status of the lock.
+ */
+function multisite_creator_check_lock_status() {
+  $config = config('multisite_creator.lock');
+
+  return $config->get('active');
+}
+
+/**
+ * Add site creation to queue.
+ */
+function multisite_creator_add_to_queue($site_data) {
+  return db_insert('multisite_creator_queue')
+    ->fields(array(
+      'site_data' => serialize($site_data),
+      'status' => 'pending',
+      'created' => time(),
+    ))
+    ->execute();
+}
+
+/**
+ * Process queue items.
+ */
+function multisite_creator_process_queue() {
+  $config = config('multisite_creator.settings');
+  multisite_creator_check_stale_lock();
+
+  if (multisite_creator_is_creation_in_progress()) {
+    return; // Already processing
+  }
+
+  $processed_sites = array();
+  $max_batch = $config->get('max_batch');
+
+  // Get multiple pending items
+  $query = db_select('multisite_creator_queue', 'q');
+  $query->fields('q');
+  $query->condition('status', 'pending');
+  $query->orderBy('created', 'ASC');
+  $query->range(0, $max_batch);
+  $items = $query->execute()->fetchAll();
+
+  if (!empty($items)) {
+    multisite_creator_set_creation_lock();
+    watchdog('multisite_creator', '$items = @items', array('@items' => print_r($items, TRUE)));
+    foreach ($items as $item) {
+      $result = multisite_creator_process_queue_item($item, FALSE); // FALSE = no restart Apache
+      if ($result) {
+        $site_data = unserialize($item->site_data);
+        $processed_sites[] = $site_data['machine_name'];
+      }
+    }
+    watchdog('multisite_creator', '$processed_sites = @processed_sites', array('@processed_sites' => print_r($processed_sites, TRUE)));
+    // A single restart of Apache at the end of the batch
+    if (!empty($processed_sites)) {
+      multisite_creator_reload_apache();
+      watchdog(
+        'multisite_creator',
+        'Batch processed @count sites: @sites',
+        array('@count' => count($processed_sites), '@sites' => implode(', ', $processed_sites))
+      );
+    }
+
+    multisite_creator_release_creation_lock();
+  }
+
+}
+
+/**
+ * Process a single queue item.
+ */
+function multisite_creator_process_queue_item($item, $restart_apache = TRUE) {
+  $config = config('multisite_creator.settings');
+  $debug = $config->get('debug');
+  // Mark as processing
+  db_update('multisite_creator_queue')
+    ->fields(array(
+      'status' => 'processing',
+      'started' => time(),
+    ))
+    ->condition('qid', $item->qid)
+    ->execute();
+
+
+  $site_data = unserialize($item->site_data);
+  $result = multisite_creator_create_site($site_data);
+
+  if ($result === TRUE) {
+    // Success
+    db_update('multisite_creator_queue')
+      ->fields(array(
+        'status' => 'completed',
+        'completed' => time(),
+      ))
+      ->condition('qid', $item->qid)
+      ->execute();
+
+    watchdog('multisite_creator', 'Queue item @qid completed: @site',
+      array('@qid' => $item->qid, '@site' => $site_data['name']));
+    return TRUE;
+  } else {
+    // Failed
+    db_update('multisite_creator_queue')
+      ->fields(array(
+        'status' => 'failed',
+        'completed' => time(),
+        'error_message' => $result,
+      ))
+      ->condition('qid', $item->qid)
+      ->execute();
+
+    if ($debug) {
+      watchdog(
+        'multisite_creator',
+        'Queue item @qid failed: @error',
+        array('@qid' => $item->qid, '@error' => $result),
+        WATCHDOG_ERROR
+      );
+    }
+
+    return FALSE;
+  }
+
+}
+
+/**
+ * Get queue status.
+ */
+function multisite_creator_get_queue_status() {
+
+  $query = db_select('multisite_creator_queue', 'q');
+  $query->fields('q', array('status'));
+  $query->addExpression('COUNT(*)', 'count');
+  $query->condition('status', array('pending', 'processing'), 'IN');
+  $query->groupBy('status');
+  $status = $query->execute()->fetchAllKeyed();
+
+  return $status;
+}

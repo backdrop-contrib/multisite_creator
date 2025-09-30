@@ -1,0 +1,118 @@
+<?php
+
+/**
+ * @file
+ * Installation and uninstallation functions for the Multisite Creator module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function multisite_creator_schema() {
+  $schema['multisite_creator_queue'] = array(
+    'description' => 'Queue for multisite creation tasks',
+    'fields' => array(
+      'qid' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Queue ID',
+      ),
+      'site_data' => array(
+        'type' => 'text',
+        'size' => 'big',
+        'description' => 'Serialized site data',
+      ),
+      'status' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'default' => 'pending',
+        'description' => 'Status: pending, processing, completed, failed',
+      ),
+      'created' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => 'Creation timestamp',
+      ),
+      'started' => array(
+        'type' => 'int',
+        'description' => 'Processing start timestamp',
+      ),
+      'completed' => array(
+        'type' => 'int',
+        'description' => 'Completion timestamp',
+      ),
+      'error_message' => array(
+        'type' => 'text',
+        'description' => 'Error message if failed',
+      ),
+    ),
+    'primary key' => array('qid'),
+    'indexes' => array(
+      'status' => array('status'),
+      'created' => array('created'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function multisite_creator_install() {
+}
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function multisite_creator_uninstall() {
+}
+
+/**
+ * Implements hook_requirements().
+ */
+function multisite_creator_requirements($phase) {
+  $requirements = array();
+
+  if ($phase === 'runtime') {
+    $t = get_t();
+
+    // Check sites directory permissions
+    $sites_dir = BACKDROP_ROOT . '/sites';
+    $writable = is_writable($sites_dir);
+
+    $requirements['multisite_creator_sites'] = array(
+      'title' => $t('Multisite Creator - Sites directory'),
+      'value' => $writable ? $t('Writable') : $t('Not writable'),
+      'severity' => $writable ? REQUIREMENT_OK : REQUIREMENT_ERROR,
+      'description' => $writable ? '' : $t('Directory @dir must be writable by the web server.', array('@dir' => $sites_dir)),
+    );
+
+    // Check if PDO MySQL is available
+    $pdo_mysql = extension_loaded('pdo_mysql');
+
+    $requirements['multisite_creator_pdo'] = array(
+      'title' => $t('Multisite Creator - PDO MySQL'),
+      'value' => $pdo_mysql ? $t('Available') : $t('Not available'),
+      'severity' => $pdo_mysql ? REQUIREMENT_OK : REQUIREMENT_ERROR,
+      'description' => $pdo_mysql ? '' : $t('PDO MySQL extension is required to create databases.'),
+    );
+
+    // Check configuration
+    $config = config('multisite_creator.settings');
+    $configured = !empty($config->get('db_user')) && !empty($config->get('base_domain'));
+
+    $requirements['multisite_creator_config'] = array(
+      'title' => $t('Multisite Creator - Configuration'),
+      'value' => $configured ? $t('Configured') : $t('Not configured'),
+      'severity' => $configured ? REQUIREMENT_OK : REQUIREMENT_WARNING,
+      'description' => $configured ? '' : $t(
+        'Configure the module at !link',
+        array('!link' => l($t('Configuration'), 'admin/config/system/multisite-creator/settings'))
+      ),
+    );
+  }
+
+  return $requirements;
+}

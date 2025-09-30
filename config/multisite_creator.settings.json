@@ -1,0 +1,22 @@
+{
+    "_config_name": "multisite_creator.settings",
+    "db_user": "backdrop_creator",
+    "db_prefix": "site_",
+    "base_domain": "",
+    "ssl_enabled": 0,
+    "certbot_path": "/usr/bin/certbot",
+    "ssl_email": "",
+    "email_notifications": 1,
+    "notification_emails": "email@example.com",
+    "email_from": "noreply@example.com",
+    "db_host": "localhost",
+    "apache_template": "",
+    "apache_ssl_template": "",
+    "apache_config_path": "/opt/homebrew/etc/httpd/extra/vhosts",
+    "apache_ensite_command": "",
+    "apache_dissite_command": "",
+    "apache_reload_command": "/opt/homebrew/opt/httpd/bin/apachectl graceful",
+    "apache_config_prefix": "msc_",
+    "debug": 0,
+    "max_batch": 5
+}
