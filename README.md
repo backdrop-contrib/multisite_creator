@@ -39,7 +39,7 @@ Bugs and Feature Requests should be reported in the Issue Queue: https://github.
 ## Current Maintainers
 
 - [Robert Garrigós](https://github.com/robertgarrigos).
-- Seeking additional maintainers.
+- Collaboration and co-maintainers welcome!
 
 ## Credits
 
