@@ -16,7 +16,7 @@ This module allows creating new Backdrop multisite websites automatically throug
 
 ## Requirements
 
-- This module requires full control of the server where the main site is runing
+- This module requires full control of the server where the main site is running
   in.
 
 ## Installation
