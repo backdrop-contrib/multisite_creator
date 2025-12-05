@@ -567,7 +567,7 @@ function multisite_creator_settings_form_validate($form, &$form_state) {
 function multisite_creator_get_site_url($machine_name) {
   $config = config('multisite_creator.settings');
   $base_domain = $config->get('base_domain');
-  return 'http://' . $machine_name . $base_domain;
+  return 'http://' . $machine_name . '.' . $base_domain;
 }
 
 
