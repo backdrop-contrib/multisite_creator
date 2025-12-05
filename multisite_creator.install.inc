@@ -437,9 +437,6 @@ function multisite_creator_create_apache_config($machine_name) {
 
     return TRUE;
   } else {
-    if (!multisite_creator_reload_apache()) {
-      throw new Exception('Could not reload Apache');
-    }
     return TRUE;
   }
 }
