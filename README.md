@@ -16,7 +16,7 @@ This module allows creating new Backdrop multisite websites automatically throug
 
 ## Requirements
 
-- This module requires full control of the server where the main site is running
+- This module requires full control of the server where the main site is runing
   in.
 
 ## Installation
@@ -39,7 +39,7 @@ Bugs and Feature Requests should be reported in the Issue Queue: https://github.
 ## Current Maintainers
 
 - [Robert Garrigós](https://github.com/robertgarrigos).
-- Collaboration and co-maintainers welcome!
+- Seeking additional maintainers.
 
 ## Credits
 

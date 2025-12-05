@@ -159,6 +159,13 @@ will apply to all websites generated with the module:
 Optional configurations not added in settings.php can be configured in the
 website creation form.
 
+#### Important
+
+This modules needs a `default.settings.php` file you need to put in `sites/deafult/`
+which will act as a templates for new subsites. You can use the main `settings.php`
+which comes with a new backdrop or download it from
+https://raw.githubusercontent.com/backdrop/backdrop/refs/heads/1.x/settings.php
+
 ### Configure Multisite Creator Module
 
 Go to `admin/config/system/multisite-creator/settings` to configure the module.

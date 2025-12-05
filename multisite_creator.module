@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Module to create new Backdrop multisite sites automatically.
@@ -26,14 +25,12 @@ function multisite_creator_menu() {
     'file' => 'multisite_creator.admin.inc',
   );
 
-  // ADD this new entry:
   $items['admin/config/system/multisite-creator/create'] = array(
     'title' => t('Create new site'),
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
 
-  // ADD this new entry:
   $items['admin/config/system/multisite-creator/manage'] = array(
     'title' => t('Manage sites'),
     'description' => t('View and manage created multisite sites'),
@@ -52,10 +49,9 @@ function multisite_creator_menu() {
     'access arguments' => array('administer site configuration'),
     'file' => 'multisite_creator.admin.inc',
     'type' => MENU_LOCAL_TASK,
-    'weight' => 10, // Change weight to order it at the end
+    'weight' => 10,
   );
 
-  // ADD this new entry:
   $items['admin/config/system/multisite-creator/delete/%'] = array(
     'title' => t('Delete site'),
     'page callback' => 'backdrop_get_form',
@@ -64,7 +60,6 @@ function multisite_creator_menu() {
     'file' => 'multisite_creator.admin.inc',
     'type' => MENU_CALLBACK,
   );
-
 
   return $items;
 }
@@ -98,7 +93,7 @@ function multisite_creator_permission() {
  * @return bool|string
  *   TRUE if created successfully, string with error if there are problems.
  */
-function multisite_creator_create_site($site_data) {
+function multisite_creator_create_site(array $site_data) {
   $config = config('multisite_creator.settings');
   $debug = $config->get('debug');
   $site_url = multisite_creator_get_site_url($site_data['machine_name']);
@@ -140,7 +135,7 @@ function multisite_creator_create_site($site_data) {
       $ssl_result = multisite_creator_add_ssl_certificate($site_data['machine_name']);
       if ($ssl_result !== TRUE) {
         if ($debug) {
-          // Don't fail completely for SSL, just warn
+          // Don't fail completely for SSL, just warn.
           watchdog(
             'multisite_creator',
             'Warning: Could not create SSL certificate for @site: @error',
@@ -162,7 +157,7 @@ function multisite_creator_create_site($site_data) {
       multisite_creator_reload_apache();
     }
 
-    // Log the operation
+    // Log the operation.
     watchdog(
       'multisite_creator',
       'New site created: @site (@url)',
@@ -171,10 +166,10 @@ function multisite_creator_create_site($site_data) {
 
     return TRUE;
   } catch (Exception $e) {
-    // Cleanup on error
+    // Cleanup on error.
     multisite_creator_cleanup_failed_site($site_data['machine_name']);
 
-    // Send error notification if enabled
+    // Send error notification if enabled.
     $email_notifications = $config->get('email_notifications');
     if ($email_notifications) {
       multisite_creator_send_error_notification($site_data, $e->getMessage());
@@ -202,7 +197,7 @@ function multisite_creator_generate_machine_name($name) {
   $machine_name = preg_replace('/_{2,}/', '_', $machine_name);
   $machine_name = trim($machine_name, '_');
 
-  // Add timestamp if already exists
+  // Add timestamp if already exists.
   if (multisite_creator_site_exists($machine_name)) {
     $machine_name .= '_' . time();
   }
@@ -217,7 +212,7 @@ function multisite_creator_site_exists($machine_name, $show_form_error = TRUE) {
   $sites_dir = BACKDROP_ROOT . '/sites/' . $machine_name;
   $dir_exists = is_dir($sites_dir);
 
-  // Check if already in queue
+  // Check if already in queue.
   $pattern = '%' . db_like('"machine_name";s:' . strlen($machine_name) . ':"' . $machine_name . '"') . '%';
   $query = db_select('multisite_creator_queue', 'q');
   $query->condition('site_data', $pattern, 'LIKE');
@@ -250,12 +245,12 @@ function multisite_creator_cleanup_failed_site($machine_name) {
   $config = config('multisite_creator.settings');
   $sites_dir = BACKDROP_ROOT . '/sites/' . $machine_name;
 
-  // Remove site directory
+  // Remove site directory.
   if (is_dir($sites_dir)) {
     multisite_creator_delete_directory($sites_dir);
   }
 
-  // Remove Apache configuration
+  // Remove Apache configuration.
   $apache_config_prefix = $config->get('apache_config_prefix');
   $path = $config->get('apache_config_path');
   $apache_config_prefix = $config->get('apache_config_prefix');
@@ -269,18 +264,18 @@ function multisite_creator_cleanup_failed_site($machine_name) {
     exec('sudo rm ' . escapeshellarg($apache_config));
   }
 
-  // Remove apache logs files
+  // Remove apache logs files.
   multisite_creator_delete_log_directories($machine_name);
 
-  // Remove SSL configuration if it exists
+  // Remove SSL configuration if it exists.
   if ($config->get('ssl_enabled')) {
     multisite_creator_cleanup_ssl_certificate($machine_name);
   }
 
-  // Remove database
+  // Remove database.
   multisite_creator_drop_database($machine_name);
 
-  // Remove from sites.php
+  // Remove from sites.php.
   multisite_creator_remove_from_sites_php($machine_name);
 
   watchdog(
@@ -296,7 +291,7 @@ function multisite_creator_cleanup_failed_site($machine_name) {
  */
 function multisite_creator_delete_directory($dir) {
   if (!is_dir($dir)) {
-    return false;
+    return FALSE;
   }
 
   $files = array_diff(scandir($dir), array('.', '..'));
@@ -326,7 +321,6 @@ function multisite_creator_delete_site_completely($machine_name) {
     }
 
     // 2. Remove Apache configuration
-
     $apache_config = $apache_config_path . '/' . $apache_config_prefix . $machine_name . '.conf';
     $apache_config_ssl = $apache_config_path . '/' . $apache_config_prefix . $machine_name . '-le-ssl.conf';
 
@@ -338,15 +332,15 @@ function multisite_creator_delete_site_completely($machine_name) {
       exec('sudo rm ' . escapeshellarg($apache_config));
       if ($config->get('ssl_enabled')) {
         if (!empty($command)) {
-          exec($command . ' ' . escapeshellarg($apache_config_prefix . $machine_name . '-le-ssl.conf') . ' 2>/dev/null');
+          exec($command . ' ' . escapeshellarg( $apache_config_prefix . $machine_name . '-le-ssl.conf') . ' 2>/dev/null');
         }
         exec('sudo rm ' . escapeshellarg($apache_config_ssl));
       }
     }
-    // Remove Apache lg files
+    // Remove Apache lg files.
     multisite_creator_delete_log_directories($machine_name);
 
-    // Remove SSL configuration if it exists
+    // Remove SSL configuration if it exists.
     if ($config->get('ssl_enabled')) {
       multisite_creator_cleanup_ssl_certificate($machine_name);
     }
@@ -356,7 +350,7 @@ function multisite_creator_delete_site_completely($machine_name) {
 
     // 4. Remove SSL certificate if it exists
     $config = config('multisite_creator.settings');
-    if ($config->get('ssl_enabled', FALSE)) {
+    if ($config->get('ssl_enabled')) {
       multisite_creator_cleanup_ssl_certificate($machine_name);
     }
 
@@ -450,13 +444,13 @@ function multisite_creator_process_queue() {
   multisite_creator_check_stale_lock();
 
   if (multisite_creator_is_creation_in_progress()) {
-    return; // Already processing
+    return; // Already processing.
   }
 
   $processed_sites = array();
   $max_batch = $config->get('max_batch');
 
-  // Get multiple pending items
+  // Get multiple pending items.
   $query = db_select('multisite_creator_queue', 'q');
   $query->fields('q');
   $query->condition('status', 'pending');
@@ -466,22 +460,25 @@ function multisite_creator_process_queue() {
 
   if (!empty($items)) {
     multisite_creator_set_creation_lock();
-    watchdog('multisite_creator', '$items = @items', array('@items' => print_r($items, TRUE)));
+    watchdog('multisite_creator', '$items = @items', array('@items' => backdrop_json_encode($items)));
     foreach ($items as $item) {
-      $result = multisite_creator_process_queue_item($item, FALSE); // FALSE = no restart Apache
+      $result = multisite_creator_process_queue_item($item, FALSE);
       if ($result) {
         $site_data = unserialize($item->site_data);
         $processed_sites[] = $site_data['machine_name'];
       }
     }
-    watchdog('multisite_creator', '$processed_sites = @processed_sites', array('@processed_sites' => print_r($processed_sites, TRUE)));
-    // A single restart of Apache at the end of the batch
+    watchdog('multisite_creator', '$processed_sites = @processed_sites', array('@processed_sites' => backdrop_json_encode($processed_sites)));
+    // A single restart of Apache at the end of the batch.
     if (!empty($processed_sites)) {
       multisite_creator_reload_apache();
       watchdog(
         'multisite_creator',
         'Batch processed @count sites: @sites',
-        array('@count' => count($processed_sites), '@sites' => implode(', ', $processed_sites))
+        array(
+          '@count' => count($processed_sites),
+          '@sites' => implode(', ', $processed_sites),
+        )
       );
     }
 
@@ -496,7 +493,7 @@ function multisite_creator_process_queue() {
 function multisite_creator_process_queue_item($item, $restart_apache = TRUE) {
   $config = config('multisite_creator.settings');
   $debug = $config->get('debug');
-  // Mark as processing
+  // Mark as processing.
   db_update('multisite_creator_queue')
     ->fields(array(
       'status' => 'processing',
@@ -505,12 +502,11 @@ function multisite_creator_process_queue_item($item, $restart_apache = TRUE) {
     ->condition('qid', $item->qid)
     ->execute();
 
-
   $site_data = unserialize($item->site_data);
   $result = multisite_creator_create_site($site_data);
 
   if ($result === TRUE) {
-    // Success
+    // Success.
     db_update('multisite_creator_queue')
       ->fields(array(
         'status' => 'completed',
@@ -523,7 +519,7 @@ function multisite_creator_process_queue_item($item, $restart_apache = TRUE) {
       array('@qid' => $item->qid, '@site' => $site_data['name']));
     return TRUE;
   } else {
-    // Failed
+    // Failed.
     db_update('multisite_creator_queue')
       ->fields(array(
         'status' => 'failed',

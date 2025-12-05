@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Installation and uninstallation functions for the Multisite Creator module.
@@ -78,7 +77,7 @@ function multisite_creator_requirements($phase) {
   if ($phase === 'runtime') {
     $t = get_t();
 
-    // Check sites directory permissions
+    // Check sites directory permissions.
     $sites_dir = BACKDROP_ROOT . '/sites';
     $writable = is_writable($sites_dir);
 
@@ -89,7 +88,7 @@ function multisite_creator_requirements($phase) {
       'description' => $writable ? '' : $t('Directory @dir must be writable by the web server.', array('@dir' => $sites_dir)),
     );
 
-    // Check if PDO MySQL is available
+    // Check if PDO MySQL is available.
     $pdo_mysql = extension_loaded('pdo_mysql');
 
     $requirements['multisite_creator_pdo'] = array(
@@ -99,7 +98,7 @@ function multisite_creator_requirements($phase) {
       'description' => $pdo_mysql ? '' : $t('PDO MySQL extension is required to create databases.'),
     );
 
-    // Check configuration
+    // Check configuration.
     $config = config('multisite_creator.settings');
     $configured = !empty($config->get('db_user')) && !empty($config->get('base_domain'));
 

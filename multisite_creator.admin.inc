@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Administration functions for the Multisite Creator module.
@@ -11,7 +10,6 @@
 function multisite_creator_form($form, &$form_state) {
   global $settings;
   require_once './core/includes/install.core.inc';
-
 
   $form['site_info'] = array(
     '#type' => 'fieldset',
@@ -61,7 +59,6 @@ function multisite_creator_form($form, &$form_state) {
     ),
     '#required' => TRUE,
   );
-
 
   $form['user1_info'] = array(
     '#type' => 'fieldset',
@@ -125,14 +122,14 @@ function multisite_creator_form($form, &$form_state) {
     );
   }
 
-  // Container for profile-specific fields
+  // Container for profile-specific fields.
   $form['profile_extra_fields'] = array(
     '#type' => 'container',
     '#prefix' => '<div id="profile-extra-fields">',
     '#suffix' => '</div>',
   );
 
-  // Add fields from selected profile
+  // Add fields from selected profile.
   $selected_profile = isset($form_state['values']['profile']) ? $form_state['values']['profile'] : '';
   if (!empty($selected_profile)) {
     multisite_creator_add_profile_fields($form, $form_state, $selected_profile);
@@ -164,28 +161,28 @@ function multisite_creator_form_validate($form, &$form_state) {
   $values = $form_state['values'];
   $machine_name = $values['machine_name'];
 
-  // Check if already exists
+  // Check if already exists.
   if (multisite_creator_site_exists($machine_name)) {
     form_set_error('machine_name', t('A site with this subdomain already exists.'));
   }
 
-  // Validate username
+  // Validate username.
   if (isset($values['user1_name']) && strlen($values['user1_name']) < 3) {
     form_set_error('user1_name', t('Username must be at least 3 characters long.'));
   }
 
-  // Validate passwords match
+  // Validate passwords match.
   if (!isset($settings['msc_user1_pass'])) {
     if ($values['user1_pass'] !== $values['user1_pass_confirm']) {
       form_set_error('user1_pass_confirm', t('Passwords do not match.'));
     }
   }
 
-  // Load profile and call its validation
+  // Load profile and call its validation.
   if (!empty($values['profile'])) {
     require_once BACKDROP_ROOT . '/core/includes/install.inc';
     $profile = $values['profile'];
-    $profile_file = _install_find_profile_file($profile, 'profile');
+    $profile_file = _install_find_profile_file($profile);
     if ($profile_file) {
       include_once $profile_file;
     }
@@ -204,7 +201,7 @@ function multisite_creator_form_submit($form, &$form_state) {
   global $settings;
   $values = $form_state['values'];
 
-  // Build extra_fields parsing field names with '__' prefix
+  // Build extra_fields parsing field names with '__' prefix.
   $extra_fields = array();
 
   foreach ($values as $field_name => $field_value) {
@@ -219,57 +216,24 @@ function multisite_creator_form_submit($form, &$form_state) {
     'name' => $values['site_name'],
     'machine_name' => $values['machine_name'],
     'profile' => $values['profile'],
-    'user1_email' => isset($settings['msc_user1_email']) ? $settings['msc_user1_email'] : $values['user1_email'],
-    'user1_name' => isset($settings['msc_user1_name']) ? $settings['msc_user1_name'] : $values['user1_name'],
-    'user1_pass' => isset($settings['msc_user1_pass']) ? $settings['msc_user1_pass'] : $values['user1_pass'],
+    'user1_email' => $settings['msc_user1_email'] ?? $values['user1_email'],
+    'user1_name' => $settings['msc_user1_name'] ?? $values['user1_name'],
+    'user1_pass' => $settings['msc_user1_pass'] ?? $values['user1_pass'],
     'extra_fields' => $extra_fields,
   );
 
-  // Always add to queue - no direct processing
+  // Always add to queue - no direct processing.
   $queue_id = multisite_creator_add_to_queue($site_data);
   $queue_status = multisite_creator_get_queue_status();
-  $pending_count = isset($queue_status['pending']) ? $queue_status['pending'] : 0;
+  $pending_count = $queue_status['pending'] ?? 0;
 
   backdrop_set_message(t(
-    'Site creation queued successfully. Queue position: @pos, ID: @id. The site will be created automatically.',
+    'Site creation queued successfully. Queue position: @pos, ID: @id. The site will be created automatically during cron.',
     array('@pos' => $pending_count, '@id' => $queue_id)
   ));
 
   $form_state['redirect'] = 'admin/config/system/multisite-creator';
 
-  // multisite_creator_check_stale_lock();
-
-  // if (multisite_creator_is_creation_in_progress()) {
-  //   // Add to queue instead of showing error
-  //   $queue_id = multisite_creator_add_to_queue($site_data);
-  //   $queue_status = multisite_creator_get_queue_status();
-  //   $pending_count = isset($queue_status['pending']) ? $queue_status['pending'] : 0;
-
-  //   backdrop_set_message(t(
-  //     'Hi ha una creació en curs. El teu lloc s\'ha afegit a la cua (posició @pos). ID: @id',
-  //     array('@pos' => $pending_count, '@id' => $queue_id)
-  //   ));
-
-  //   $form_state['redirect'] = 'admin/config/system/multisite-creator/manage';
-  //   return;
-  // }
-
-  // multisite_creator_set_creation_lock();
-  // $result = multisite_creator_create_site($site_data);
-  // multisite_creator_release_creation_lock();
-
-  // if ($result === TRUE) {
-  //   $site_url = multisite_creator_get_site_url($site_data['machine_name']);
-  //   backdrop_set_message(t(
-  //     'Site "@name" has been created successfully. You can access it at: <a href="@url" target="_blank">@url</a>',
-  //     array('@name' => $site_data['name'], '@url' => $site_url)
-  //   ));
-
-  //   // Redirect to configuration page
-  //   $form_state['redirect'] = 'admin/config/system/multisite-creator';
-  // } else {
-  //   backdrop_set_message(t('Error creating site: @error', array('@error' => $result)), 'error');
-  // }
 }
 
 /**
@@ -283,14 +247,14 @@ function multisite_creator_profile_fields_callback($form, $form_state) {
  * Adds specific fields from the selected profile.
  */
 function multisite_creator_add_profile_fields(&$form, &$form_state, $profile) {
-  // Manually load the .profile file
+  // Manually load the .profile file.
   $profile_file = BACKDROP_ROOT . '/profiles/' . $profile . '/' . $profile . '.profile';
 
   if (file_exists($profile_file)) {
     include_once $profile_file;
   }
 
-  // Call profile-specific function to add fields
+  // Call profile-specific function to add fields.
   $function = $profile . '_multisite_creator_form_alter';
 
   if (function_exists($function)) {
@@ -370,8 +334,6 @@ function multisite_creator_settings_form($form, &$form_state) {
     '#description' => t('Template for Apache configuration. Use {MACHINE_NAME} and {DOMAIN} as variables.'),
     '#rows' => 15,
   );
-
-
 
   $form['apache']['create_log_directories'] = array(
     '#type' => 'checkbox',
@@ -476,19 +438,6 @@ function multisite_creator_settings_form($form, &$form_state) {
     ),
   );
 
-  // not used right now, as we do not create SSL certificates for each site.
-  // $form['ssl']['ssl_email'] = array(
-  //   '#type' => 'email',
-  //   '#title' => t('Let\'s Encrypt email'),
-  //   '#default_value' => $config->get('ssl_email'),
-  //   '#description' => t('Email address to register with Let\'s Encrypt. Not used right now.'),
-  //   '#states' => array(
-  //     'visible' => array(
-  //       ':input[name="ssl_enabled"]' => array('checked' => TRUE),
-  //     ),
-  //   ),
-  // );
-
   $form['notifications'] = array(
     '#type' => 'fieldset',
     '#title' => t('Email notifications'),
@@ -564,8 +513,8 @@ function multisite_creator_settings_form($form, &$form_state) {
   $form['cron']['max_batch'] = array(
     '#type' => 'number',
     '#title' => t('Max. batch'),
-    '#default_value' => $config->get('max_batch')?: 5,
-    '#description'  => t('Number of sites processed for each cron run.')
+    '#default_value' => $config->get('max_batch') ?: 5,
+    '#description'  => t('Number of sites processed for each cron run.'),
   );
 
   return system_settings_form($form);
@@ -577,17 +526,14 @@ function multisite_creator_settings_form($form, &$form_state) {
 function multisite_creator_settings_form_validate($form, &$form_state) {
   $values = $form_state['values'];
 
-  // Validate domain
+  // Validate domain.
   $domain = $values['base_domain'];
   if (!filter_var('http://' . $domain, FILTER_VALIDATE_URL)) {
     form_set_error('base_domain', t('The domain does not have a valid format.'));
   }
 
-  // Validate SSL configuration
+  // Validate SSL configuration.
   if ($values['ssl_enabled']) {
-    // if (empty($values['ssl_email'])) {
-    //   form_set_error('ssl_email', t('You must specify an email for Let\'s Encrypt.'));
-    // }
 
     $certbot_path = $values['certbot_path'];
     if (!file_exists($certbot_path) || !is_executable($certbot_path)) {
@@ -595,12 +541,12 @@ function multisite_creator_settings_form_validate($form, &$form_state) {
     }
   }
 
-  // Validate notification configuration
+  // Validate notification configuration.
   if ($values['email_notifications']) {
     if (empty($values['notification_emails'])) {
       form_set_error('notification_emails', t('You must specify at least one email for notifications.'));
     } else {
-      // Validate email formats
+      // Validate email formats.
       $emails = preg_split('/[,\s]+/', trim($values['notification_emails']));
       foreach ($emails as $email) {
         if (!filter_var(trim($email), FILTER_VALIDATE_EMAIL)) {
@@ -621,7 +567,7 @@ function multisite_creator_settings_form_validate($form, &$form_state) {
 function multisite_creator_get_site_url($machine_name) {
   $config = config('multisite_creator.settings');
   $base_domain = $config->get('base_domain');
-  return 'http://' . $machine_name . '.' . $base_domain;
+  return 'http://' . $machine_name . $base_domain;
 }
 
 
@@ -634,7 +580,7 @@ function multisite_creator_manage_sites_page() {
   if (empty($sites)) {
     return array(
       '#markup' => '<p>' . t('No multisite sites have been created yet. ') .
-        l(t('Create the first site'), 'admin/config/system/multisite-creator') . '</p>',
+      l(t('Create the first site'), 'admin/config/system/multisite-creator') . '</p>',
     );
   }
 
@@ -651,7 +597,7 @@ function multisite_creator_manage_sites_page() {
   foreach ($sites as $machine_name => $site_info) {
     $site_url = multisite_creator_get_site_url($machine_name);
 
-    // Determine site status
+    // Determine site status.
     $status = multisite_creator_get_site_status($machine_name);
     $status_class = $status['status'] === 'active' ? 'status-ok' : 'status-warning';
 
@@ -697,15 +643,15 @@ function multisite_creator_manage_sites_page() {
 
   $build['actions'] = array(
     '#markup' => '<p>' .
-      l(
+    l(
         t('Create new site'),
         'admin/config/system/multisite-creator',
         array('attributes' => array('class' => array('button', 'button-primary')))
-      ) .
-      '</p>',
+    ) .
+    '</p>',
   );
 
-  // Add custom CSS
+  // Add custom CSS.
   $build['#attached']['css'][] = array(
     'data' => '
       .multisite-table .status-ok { color: green; font-weight: bold; }
@@ -748,7 +694,7 @@ function multisite_creator_get_existing_sites() {
       continue;
     }
 
-    // Try to get site information
+    // Try to get site information.
     $site_info = multisite_creator_get_site_info($dir);
     $sites[$dir] = $site_info;
   }
@@ -769,13 +715,14 @@ function multisite_creator_get_site_info($machine_name) {
     'size' => 0,
   );
 
-  // Get directory creation date
+  // Get directory creation date.
   if (is_dir($sites_dir)) {
     $info['created'] = filemtime($sites_dir);
     $info['size'] = multisite_creator_get_directory_size($sites_dir);
   }
 
-  // Try to get site name from logs
+  // Try to get site name from logs.
+  // TODO: there must be a better way to get this info than from watchdog.
   $query = db_select('watchdog', 'w');
   $query->fields('w', array('message', 'variables'));
   $query->condition('type', 'multisite_creator');
@@ -801,21 +748,24 @@ function multisite_creator_get_site_info($machine_name) {
 function multisite_creator_get_site_status($machine_name) {
   $site_url = multisite_creator_get_site_url($machine_name);
 
-  // Check if the site responds
+  // Check if the site responds.
   $context = stream_context_create(array(
     'http' => array(
       'timeout' => 5,
       'method' => 'GET',
-    )
+    ),
   ));
 
-  $response = @file_get_contents($site_url, false, $context);
+  $response = @file_get_contents($site_url, FALSE, $context);
 
   if ($response !== FALSE) {
     if (strpos($response, 'backdrop') !== FALSE || strpos($response, 'Backdrop') !== FALSE) {
       return array('status' => 'active', 'message' => t('Active'));
     } else {
-      return array('status' => 'warning', 'message' => t('Responds but may have issues'));
+      return array(
+        'status' => 'warning',
+        'message' => t('Responds but may have issues'),
+      );
     }
   } else {
     return array('status' => 'error', 'message' => t('Not responding'));
@@ -843,14 +793,14 @@ function multisite_creator_delete_form($form, &$form_state, $machine_name) {
 
   $form['site_info'] = array(
     '#markup' => '<div class="messages warning">' .
-      '<h3>' . t('You are about to delete the site:') . '</h3>' .
-      '<ul>' .
-      '<li><strong>' . t('Name:') . '</strong> ' . ($site_info['name'] ?: $machine_name) . '</li>' .
-      '<li><strong>' . t('URL:') . '</strong> ' . $site_url . '</li>' .
-      '<li><strong>' . t('Directory:') . '</strong> sites/' . $machine_name . '</li>' .
-      '</ul>' .
-      '<p><strong>' . t('THIS ACTION CANNOT BE UNDONE!') . '</strong></p>' .
-      '</div>',
+    '<h3>' . t('You are about to delete the site:') . '</h3>' .
+    '<ul>' .
+    '<li><strong>' . t('Name:') . '</strong> ' . ($site_info['name'] ?: $machine_name) . '</li>' .
+    '<li><strong>' . t('URL:') . '</strong> ' . $site_url . '</li>' .
+    '<li><strong>' . t('Directory:') . '</strong> sites/' . $machine_name . '</li>' .
+    '</ul>' .
+    '<p><strong>' . t('THIS ACTION CANNOT BE UNDONE!') . '</strong></p>' .
+    '</div>',
   );
 
   $form['confirmation'] = array(
@@ -892,7 +842,7 @@ function multisite_creator_delete_form_validate($form, &$form_state) {
 function multisite_creator_delete_form_submit($form, &$form_state) {
   $machine_name = $form_state['values']['machine_name'];
 
-  // Delete the site completely
+  // Delete the site completely.
   $success = multisite_creator_delete_site_completely($machine_name);
 
   if ($success) {
@@ -913,6 +863,9 @@ function multisite_creator_delete_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'admin/config/system/multisite-creator/manage';
 }
 
+/**
+ *
+ */
 function multisite_creator_default_email_template() {
   $template = array();
   $template[] = 'A new multisite website has been created:';

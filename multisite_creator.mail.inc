@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Functions for sending email notifications.
@@ -13,7 +12,7 @@
  * @param string $site_url
  *   URL of the new site.
  */
-function multisite_creator_send_creation_notification($site_data, $site_url) {
+function multisite_creator_send_creation_notification(array $site_data, $site_url) {
   $config = config('multisite_creator.settings');
 
   $notification_emails = $config->get('notification_emails');
@@ -24,13 +23,13 @@ function multisite_creator_send_creation_notification($site_data, $site_url) {
   $emails = multisite_creator_parse_email_list($notification_emails);
   $from_email = $config->get('email_from');
 
-  // Get email template
+  // Get email template.
   $template = $config->get('email_template');
   if (empty($template)) {
     $template = multisite_creator_default_email_template();
   }
 
-  // Prepare replacements
+  // Prepare replacements.
   $replacements = array(
     '{SITE_NAME}' => $site_data['name'],
     '{MACHINE_NAME}' => $site_data['machine_name'],
@@ -41,13 +40,13 @@ function multisite_creator_send_creation_notification($site_data, $site_url) {
     '{HOST}' => $_SERVER['HTTP_HOST'],
   );
 
-  // Replace variables in template
+  // Replace variables in template.
   $body = str_replace(array_keys($replacements), array_values($replacements), $template);
 
-  // Prepare subject
+  // Prepare subject.
   $subject = t('New site created: @name', array('@name' => $site_data['name']));
 
-  // Send email to all recipients
+  // Send email to all recipients.
   $sent_count = 0;
   foreach ($emails as $email) {
     if (multisite_creator_send_email($email, $from_email, $subject, $body)) {
@@ -74,7 +73,7 @@ function multisite_creator_send_creation_notification($site_data, $site_url) {
  * @param string $error_message
  *   Error message.
  */
-function multisite_creator_send_error_notification($site_data, $error_message) {
+function multisite_creator_send_error_notification(array $site_data, $error_message) {
   global $user;
   $config = config('multisite_creator.settings');
 
@@ -86,7 +85,7 @@ function multisite_creator_send_error_notification($site_data, $error_message) {
   $emails = multisite_creator_parse_email_list($notification_emails);
   $from_email = $config->get('email_from');
 
-  // Prepare email content
+  // Prepare email content.
   $subject = t('ERROR: Failed creating site @name', array('@name' => $site_data['name']));
 
   $message = array();
@@ -103,7 +102,7 @@ function multisite_creator_send_error_notification($site_data, $error_message) {
   $message[] = t('Server: @host', array('@host' => $_SERVER['HTTP_HOST']));
   $message[] = t('User IP: @ip', array('@ip' => $_SERVER['REMOTE_ADDR']));
 
-  // Add technical information
+  // Add technical information.
   $message[] = '';
   $message[] = t('TECHNICAL INFORMATION:');
   $message[] = t('User: @user', array('@user' => $user ? $user->name : 'Anonymous'));
@@ -119,7 +118,7 @@ function multisite_creator_send_error_notification($site_data, $error_message) {
 
   $body = implode("\n", $message);
 
-  // Send email to all recipients
+  // Send email to all recipients.
   $sent_count = 0;
   foreach ($emails as $email) {
     if (multisite_creator_send_email($email, $from_email, $subject, $body)) {
@@ -211,7 +210,7 @@ function multisite_creator_send_weekly_summary() {
     return FALSE;
   }
 
-  // Gather statistics from the past week
+  // Gather statistics from the past week.
   $week_ago = time() - (7 * 24 * 60 * 60);
 
   // Count sites created this week (simplified)
@@ -221,7 +220,7 @@ function multisite_creator_send_weekly_summary() {
   $query->condition('timestamp', $week_ago, '>');
   $sites_created = $query->countQuery()->execute()->fetchField();
 
-  // Count errors
+  // Count errors.
   $query = db_select('watchdog', 'w');
   $query->condition('type', 'multisite_creator');
   $query->condition('severity', WATCHDOG_ERROR);
@@ -229,13 +228,13 @@ function multisite_creator_send_weekly_summary() {
   $errors = $query->countQuery()->execute()->fetchField();
 
   if ($sites_created == 0 && $errors == 0) {
-    return FALSE; // No activity
+    return FALSE; // No activity.
   }
 
   $emails = multisite_creator_parse_email_list($notification_emails);
   $from_email = $config->get('email_from');
 
-  // Prepare content
+  // Prepare content.
   $subject = t('Weekly summary - Multisite Creator');
 
   $message = array();
@@ -251,7 +250,7 @@ function multisite_creator_send_weekly_summary() {
 
   $body = implode("\n", $message);
 
-  // Send email
+  // Send email.
   $sent_count = 0;
   foreach ($emails as $email) {
     if (multisite_creator_send_email($email, $from_email, $subject, $body)) {

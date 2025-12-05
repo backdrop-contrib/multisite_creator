@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Hooks provided by the Multisite Creator module.
@@ -27,19 +26,19 @@
  * @param array &$form_state
  *   The current form state.
  *
- * Field naming convention:
- * - Field names must follow the pattern: [form_name]__[field_name]
- * - form_name: Name of the profile form where data will be sent
- * - field_name: Name of the field within the profile form
- * - Example: 'my_profile_config_form__extra_user_name'
+ *   Field naming convention:
+ *   - Field names must follow the pattern: [form_name]__[field_name]
+ *   - form_name: Name of the profile form where data will be sent
+ *   - field_name: Name of the field within the profile form
+ *   - Example: 'my_profile_config_form__extra_user_name'
  *
- * During installation, these fields will be converted to arguments:
- * my_profile_config_form.extra_user_name=value
+ *   During installation, these fields will be converted to arguments:
+ *   my_profile_config_form.extra_user_name=value.
  *
  * @see install.sh
  * @see hook_install_tasks()
  */
-function hook_multisite_creator_form_alter(&$form, &$form_state) {
+function hook_multisite_creator_form_alter(array &$form, array &$form_state) {
   $form['extra_config'] = array(
     '#type' => 'fieldset',
     '#title' => t('Extra configuration for my profile'),
@@ -47,7 +46,7 @@ function hook_multisite_creator_form_alter(&$form, &$form_state) {
   );
 
   // Field to create an extra user
-  // Will be converted to: my_profile_config_form.extra_user_name=value
+  // Will be converted to: my_profile_config_form.extra_user_name=value.
   $form['extra_config']['my_profile_config_form__extra_user_name'] = array(
     '#type' => 'textfield',
     '#title' => t('Extra username'),
@@ -67,7 +66,7 @@ function hook_multisite_creator_form_alter(&$form, &$form_state) {
     '#description' => t('Password for the extra site user.'),
   );
 
-  // Example with multiple forms
+  // Example with multiple forms.
   $form['extra_config']['my_profile_settings_form__site_slogan'] = array(
     '#type' => 'textfield',
     '#title' => t('Site slogan'),
@@ -83,10 +82,10 @@ function hook_multisite_creator_form_alter(&$form, &$form_state) {
  * @param array &$form_state
  *   The form state.
  */
-function hook_multisite_creator_form_validate($form, &$form_state) {
+function hook_multisite_creator_form_validate(array $form, array &$form_state) {
   $values = $form_state['values'];
 
-  // Validate that extra username has at least 3 characters
+  // Validate that extra username has at least 3 characters.
   if (!empty($values['my_profile_config_form__extra_user_name'])) {
     if (strlen($values['my_profile_config_form__extra_user_name']) < 3) {
       form_set_error(
@@ -96,7 +95,7 @@ function hook_multisite_creator_form_validate($form, &$form_state) {
     }
   }
 
-  // Validate that if username is provided, email is also provided
+  // Validate that if username is provided, email is also provided.
   $user_name = $values['my_profile_config_form__extra_user_name'];
   $user_email = $values['my_profile_config_form__extra_user_email'];
 
@@ -117,7 +116,7 @@ function hook_multisite_creator_form_validate($form, &$form_state) {
 function hook_install_tasks($install_state) {
   $tasks = array();
 
-  // Define custom task to process extra fields
+  // Define custom task to process extra fields.
   $tasks['my_profile_config_form'] = array(
     'display_name' => t('Extra profile configuration'),
     'type' => 'form',
@@ -133,7 +132,7 @@ function hook_install_tasks($install_state) {
  * Form to process arguments from multisite creator.
  */
 function hook_config_form($form, &$form_state, &$install_state) {
-  // Hidden fields to receive values from arguments
+  // Hidden fields to receive values from arguments.
   $form['extra_user_name'] = array(
     '#type' => 'hidden',
     '#default_value' => '',
@@ -160,7 +159,7 @@ function hook_config_form($form, &$form_state, &$install_state) {
 function hook_config_form_submit($form, &$form_state) {
   $values = $form_state['values'];
 
-  // Create extra user if data is provided
+  // Create extra user if data is provided.
   if (!empty($values['extra_user_name']) && !empty($values['extra_user_email'])) {
     $account = entity_create('user', array());
     $account->name = $values['extra_user_name'];

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Functions to manage SSL certificates with Let's Encrypt.
@@ -26,26 +25,26 @@ function multisite_creator_create_ssl_certificate($machine_name) {
   $certbot_path = $config->get('certbot_path');
   $ssl_email = $config->get('ssl_email');
   $base_domain = $config->get('base_domain');
-  $domain = $machine_name . '.' . $base_domain;
+  $domain = "$machine_name.$base_domain";
 
-  // Verify that certbot exists
+  // Verify that certbot exists.
   if (!file_exists($certbot_path) || !is_executable($certbot_path)) {
     return 'Certbot is not installed or is not executable';
   }
 
-  // Verify that the domain resolves correctly
+  // Verify that the domain resolves correctly.
   if (!multisite_creator_check_domain_dns($domain)) {
     return 'Domain ' . $domain . ' does not resolve correctly. Configure DNS first.';
   }
 
   try {
-    // Create certificate with certbot
+    // Create certificate with certbot.
     $result = multisite_creator_run_certbot($domain, $ssl_email, $certbot_path);
     if ($result !== TRUE) {
       return $result;
     }
 
-    // Restart Apache to apply SSL changes
+    // Restart Apache to apply SSL changes.
     if (!multisite_creator_reload_apache()) {
       return 'Could not restart Apache after configuring SSL';
     }
@@ -79,22 +78,22 @@ function multisite_creator_add_ssl_certificate($machine_name) {
   $base_domain = $config->get('base_domain');
   $domain = $machine_name . '.' . $base_domain;
 
-  // Replace variables in template
+  // Replace variables in template.
   $apache_config = str_replace('{MACHINE_NAME}', $machine_name, $template);
   $apache_config = str_replace('{DOMAIN}', $domain, $apache_config);
 
-  // Write configuration using temporary file
+  // Write configuration using temporary file.
   $path = $config->get('apache_config_path');
   $config_file = $path . '/' . $apache_config_prefix . $machine_name . '-le-ssl.conf';
   $temp_file = '/tmp/apache_ssl_' . $machine_name . '.conf';
 
   try {
-    // Write to temporary file first
+    // Write to temporary file first.
     if (file_put_contents($temp_file, $apache_config) === FALSE) {
       throw new Exception('Could not create temporary file');
     }
 
-    // Copy with sudo to final directory
+    // Copy with sudo to final directory.
     $copy_command = sprintf(
       'sudo cp %s %s',
       escapeshellarg($temp_file),
@@ -111,7 +110,7 @@ function multisite_creator_add_ssl_certificate($machine_name) {
         WATCHDOG_INFO
       );
     }
-    exec($copy_command . ' 2>&1', $output, $return_code);
+    exec("$copy_command 2>&1", $output, $return_code);
     if ($debug) {
       watchdog(
         'multisite_creator',
@@ -120,7 +119,7 @@ function multisite_creator_add_ssl_certificate($machine_name) {
         WATCHDOG_INFO
       );
     }
-    // Clean up temporary file
+    // Clean up temporary file.
     unlink($temp_file);
 
     if ($return_code !== 0) {
@@ -140,7 +139,7 @@ function multisite_creator_add_ssl_certificate($machine_name) {
 
   // Enable the site
   // TODO: if log directories are created in config, they must be created before
-  // restarting apache, otherwise it gives error
+  // restarting apache, otherwise it gives error.
   $command = $config->get('apache_ensite_command');
   if (!empty($command)) {
     $command = $command . ' ' . escapeshellarg($apache_config_prefix . $machine_name . '-le-ssl.conf');
@@ -148,7 +147,7 @@ function multisite_creator_add_ssl_certificate($machine_name) {
     $return_code = 0;
 
     try {
-      exec($command . ' 2>&1', $output, $return_code);
+      exec("$command 2>&1", $output, $return_code);
 
       if ($return_code !== 0) {
         throw new Exception('Enable SSL site command failed: ' . implode(' ', $output));
@@ -177,12 +176,12 @@ function multisite_creator_add_ssl_certificate($machine_name) {
 function multisite_creator_run_certbot($domain, $email, $certbot_path) {
   $config = config('multisite_creator.settings');
   $debug = $config->get('debug');
-  // Check if certificate already exists
+  // Check if certificate already exists.
   if (multisite_creator_ssl_certificate_exists($domain)) {
-    return TRUE; // Already exists, nothing to do
+    return TRUE; // Already exists, nothing to do.
   }
 
-  // Build certbot command
+  // Build certbot command.
   $command = sprintf(
     'sudo %s --apache -m %s --agree-tos -n -d %s',
     escapeshellarg($certbot_path),
@@ -192,7 +191,7 @@ function multisite_creator_run_certbot($domain, $email, $certbot_path) {
 
   $output = array();
   $return_code = 0;
-  exec($command . ' 2>&1', $output, $return_code);
+  exec("$command 2>&1", $output, $return_code);
 
   if ($return_code === 0) {
     return TRUE;
@@ -206,7 +205,7 @@ function multisite_creator_run_certbot($domain, $email, $certbot_path) {
         WATCHDOG_ERROR
       );
     }
-    return 'Certbot error: ' . $error_output;
+    return "Certbot error: $error_output";
   }
 }
 
@@ -222,18 +221,18 @@ function multisite_creator_ssl_certificate_exists($domain) {
  * Checks that the domain resolves correctly.
  */
 function multisite_creator_check_domain_dns($domain) {
-  // Get current server IP
+  // Get current server IP.
   $server_ip = multisite_creator_get_server_ip();
 
-  // Resolve the domain
+  // Resolve the domain.
   $domain_ip = gethostbyname($domain);
 
-  // If gethostbyname returns the same string, it couldn't resolve
+  // If gethostbyname returns the same string, it couldn't resolve.
   if ($domain_ip === $domain) {
     return FALSE;
   }
 
-  // Check if domain points to current server
+  // Check if domain points to current server.
   return $domain_ip === $server_ip;
 }
 
@@ -241,7 +240,7 @@ function multisite_creator_check_domain_dns($domain) {
  * Gets the server's public IP.
  */
 function multisite_creator_get_server_ip() {
-  // Try different methods to get IP
+  // Try different methods to get IP.
   $methods = array(
     'curl -s https://api.ipify.org',
     'curl -s https://icanhazip.com',
@@ -251,7 +250,7 @@ function multisite_creator_get_server_ip() {
   foreach ($methods as $method) {
     $output = array();
     $return_code = 0;
-    exec($method . ' 2>/dev/null', $output, $return_code);
+    exec("$method 2>/dev/null", $output, $return_code);
 
     if ($return_code === 0 && !empty($output[0])) {
       $ip = trim($output[0]);
@@ -261,14 +260,14 @@ function multisite_creator_get_server_ip() {
     }
   }
 
-  // Fallback: use network interface IP
+  // Fallback: use network interface IP.
   $output = array();
   exec("hostname -I | awk '{print $1}'", $output);
   if (!empty($output[0])) {
     return trim($output[0]);
   }
 
-  return '127.0.0.1'; // Last option
+  return '127.0.0.1'; // Last option.
 }
 
 
@@ -279,14 +278,14 @@ function multisite_creator_cleanup_ssl_certificate($machine_name) {
   $config = config('multisite_creator.settings');
   $apache_config_prefix = $config->get('apache_config_prefix');
   $base_domain = $config->get('base_domain');
-  $domain = $machine_name . '.' . $base_domain;
+  $domain = "$machine_name.$base_domain";
   $certbot_path = $config->get('certbot_path');
 
   if (!file_exists($certbot_path)) {
     return FALSE;
   }
 
-  // Remove certificate with certbot
+  // Remove certificate with certbot.
   $command = sprintf(
     'sudo %s delete --cert-name %s -n',
     escapeshellarg($certbot_path),
@@ -295,12 +294,12 @@ function multisite_creator_cleanup_ssl_certificate($machine_name) {
 
   $output = array();
   $return_code = 0;
-  exec($command . ' 2>&1', $output, $return_code);
+  exec("$command 2>&1", $output, $return_code);
 
-  // Remove Apache SSL configuration
+  // Remove Apache SSL configuration.
   $ssl_config_file = '/etc/apache2/sites-available/' . $apache_config_prefix . $machine_name . '-ssl.conf';
   if (file_exists($ssl_config_file)) {
-    // Disable SSL site
+    // Disable SSL site.
     exec('a2dissite ' . escapeshellarg($machine_name . '-ssl.conf') . ' 2>/dev/null');
     unlink($ssl_config_file);
   }
@@ -325,7 +324,7 @@ function multisite_creator_check_ssl_status($machine_name) {
     );
   }
 
-  // Check expiration date
+  // Check expiration date.
   $cert_info = openssl_x509_parse(file_get_contents($cert_path));
   if ($cert_info === FALSE) {
     return array(
