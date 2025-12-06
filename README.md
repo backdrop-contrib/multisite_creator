@@ -39,11 +39,10 @@ Bugs and Feature Requests should be reported in the Issue Queue: https://github.
 ## Current Maintainers
 
 - [Robert Garrigós](https://github.com/robertgarrigos).
-- Seeking additional maintainers.
 
 ## Credits
 
-- Originally written for Backdrop by [Robert Garrigós](https://www.drupal.org/robertgarrigos).
+- Originally written for Backdrop by [Robert Garrigós](https://www.drupal.org/robertgarrigos) and sponsored by [techora.cat](https://techora.cat)
 
 ## License
 

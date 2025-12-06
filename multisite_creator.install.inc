@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Installation functions for the Multisite Creator module.
@@ -14,28 +13,28 @@ function multisite_creator_create_site_directory($machine_name) {
   $debug = $config->get('debug');
 
   if (!is_dir($sites_dir)) {
-    if (!mkdir($sites_dir, 0755, true)) {
+    if (!mkdir($sites_dir, 0755, TRUE)) {
       return FALSE;
     }
   }
 
-  // Create necessary subdirectories
+  // Create necessary subdirectories.
   $subdirs = array('files', 'files/styles', 'modules', 'themes', 'layouts');
   foreach ($subdirs as $subdir) {
-    $full_path = $sites_dir . '/' . $subdir;
+    $full_path = $sites_dir . '/' .$subdir;
     if (!is_dir($full_path)) {
-      if (!mkdir($full_path, 0755, true)) {
+      if (!mkdir($full_path, 0755, TRUE)) {
         return FALSE;
       }
     }
   }
 
-  // Create .htaccess for files directory
+  // Create .htaccess for files directory.
   $source_htaccess = BACKDROP_ROOT . '/sites/default/files/.htaccess';
   $target_htaccess = $sites_dir . '/files/.htaccess';
 
   if (file_exists($source_htaccess)) {
-    // Copy the official Backdrop .htaccess
+    // Copy the official Backdrop .htaccess.
     if (!copy($source_htaccess, $target_htaccess) && $debug) {
       watchdog(
         'multisite_creator',
@@ -45,7 +44,7 @@ function multisite_creator_create_site_directory($machine_name) {
       );
     }
   } else {
-    // Fallback with correct Backdrop .htaccess
+    // Fallback with correct Backdrop .htaccess.
     $htaccess_content = "# Turn off all options we don't need.\n";
     $htaccess_content .= "Options -Indexes -ExecCGI -Includes\n";
     $htaccess_content .= "# Set the catch-all handler to prevent scripts from being executed.\n";
@@ -71,18 +70,21 @@ function multisite_creator_create_site_directory($machine_name) {
   return TRUE;
 }
 
+/**
+ *
+ */
 function multisite_creator_create_settings_file($site_data) {
   $sites_dir = BACKDROP_ROOT . '/sites/' . $site_data['machine_name'];
   $settings_file = $sites_dir . '/settings.php';
 
-  // Use the official Backdrop template
+  // Use the official Backdrop template.
   $template_file = BACKDROP_ROOT . '/sites/default/default.settings.php';
 
   if (file_exists($template_file)) {
-    // Copy the official template
+    // Copy the official template.
     return copy($template_file, $settings_file);
   } else {
-    // Fallback: minimal structure expected by Backdrop
+    // Fallback: minimal structure expected by Backdrop.
     $settings_content = "<?php\n\n";
     $settings_content .= "/**\n * @file\n * Backdrop CMS site configuration file.\n */\n\n";
     $settings_content .= "// \$database = '';\n";
@@ -100,7 +102,7 @@ function multisite_creator_create_database($machine_name) {
   $config = config('multisite_creator.settings');
   $debug = $config->get('debug');
 
-  // Determine database configuration
+  // Determine database configuration.
   $db_host = $config->get('db_host');
 
   $db_user = $config->get('db_user');
@@ -109,11 +111,11 @@ function multisite_creator_create_database($machine_name) {
   $db_name = $db_prefix . $machine_name;
 
   try {
-    // Connect to MySQL server
+    // Connect to MySQL server.
     $connection = new PDO("mysql:host=$db_host", $db_user, $db_password);
     $connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Create the database
+    // Create the database.
     $sql = "CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci";
     $connection->exec($sql);
 
@@ -131,12 +133,15 @@ function multisite_creator_create_database($machine_name) {
   }
 }
 
+/**
+ *
+ */
 function multisite_creator_prepare_database($machine_name) {
   global $settings;
   $config = config('multisite_creator.settings');
   $debug = $config->get('debug');
 
-  // Determine database configuration
+  // Determine database configuration.
   $db_host = $config->get('db_host');
   $db_user = $config->get('db_user');
   $db_password = $settings['msc_db_pass'];
@@ -147,9 +152,8 @@ function multisite_creator_prepare_database($machine_name) {
     $connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // ONLY ensure user has permissions to create this database
-    // DO NOT create the database - let the installer do it
-
-    // Optional: verify user can create databases
+    // DO NOT create the database - let the installer do it.
+    // Optional: verify user can create databases.
     $test_result = $connection->query("SELECT 1");
     if ($test_result) {
       watchdog(
@@ -180,23 +184,23 @@ function multisite_creator_prepare_database($machine_name) {
  */
 function multisite_creator_update_sites_php($machine_name) {
   $config = config('multisite_creator.settings');
-  $base_domain = $config->get('base_domain', 'example.com');
+  $base_domain = $config->get('base_domain');
   $domain = $machine_name . '.' . $base_domain;
 
   $sites_file = BACKDROP_ROOT . '/sites/sites.php';
 
-  // Create sites.php if it doesn't exist
+  // Create sites.php if it doesn't exist.
   if (!file_exists($sites_file)) {
     $sites_content = "<?php\n/**\n * Multisite configuration.\n */\n\n";
   } else {
     $sites_content = file_get_contents($sites_file);
   }
 
-  // Add entry if it doesn't exist
+  // Add entry if it doesn't exist.
   $site_entry = "\$sites['$domain'] = '$machine_name';\n";
 
-  // Check if it already exists
-  if (strpos($sites_content, "\$sites['$domain']") === false) {
+  // Check if it already exists.
+  if (strpos($sites_content, "\$sites['$domain']") === FALSE) {
     $sites_content .= $site_entry;
 
     if (file_put_contents($sites_file, $sites_content) !== FALSE) {
@@ -212,7 +216,7 @@ function multisite_creator_update_sites_php($machine_name) {
  */
 function multisite_creator_remove_from_sites_php($machine_name) {
   $config = config('multisite_creator.settings');
-  $base_domain = $config->get('base_domain', 'example.com');
+  $base_domain = $config->get('base_domain');
   $domain = $machine_name . '.' . $base_domain;
 
   $sites_file = BACKDROP_ROOT . '/sites/sites.php';
@@ -223,7 +227,7 @@ function multisite_creator_remove_from_sites_php($machine_name) {
 
   $sites_content = file_get_contents($sites_file);
 
-  // Remove entries
+  // Remove entries.
   $patterns = array(
     "/\\\$sites\['$domain'\] = '$machine_name';\n?/",
   );
@@ -236,23 +240,26 @@ function multisite_creator_remove_from_sites_php($machine_name) {
 }
 
 
+/**
+ *
+ */
 function multisite_creator_install_backdrop($site_data) {
   global $settings;
 
   $config = config('multisite_creator.settings');
   $debug = $config->get('debug');
 
-  // Variable configuration
+  // Variable configuration.
   $profile = $site_data['profile'];
   $db_host = $config->get('db_host');
   $db_user = $config->get('db_user');
-  $db_password = $settings['msc_db_pass']; // From settings.php
+  $db_password = $settings['msc_db_pass']; // From settings.php.
   $db_prefix = $config->get('db_prefix');
   $db_name = $db_prefix . $site_data['machine_name'];
   $base_domain = $config->get('base_domain');
   $site_url = 'http://' . $site_data['machine_name'] . '.' . $base_domain;
 
-  // Build database URL
+  // Build database URL.
   $db_url = sprintf(
     'mysql://%s:%s@%s/%s',
     urlencode($db_user),
@@ -261,21 +268,21 @@ function multisite_creator_install_backdrop($site_data) {
     $db_name
   );
 
-  // Build optional extra arguments
+  // Build optional extra arguments.
   $extra_args = '';
   if (isset($site_data['extra_fields']) && is_array($site_data['extra_fields'])) {
     foreach ($site_data['extra_fields'] as $form_name => $fields) {
       if (is_array($fields)) {
         foreach ($fields as $field_name => $field_value) {
           if (!empty($field_value)) {
-            $extra_args .= ' ' . escapeshellarg("{$form_name}.{$field_name}={$field_value}");
+            $extra_args .= ' ' . escapeshellarg($form_name . $field_name . '=' . $field_value);
           }
         }
       }
     }
   }
 
-  // Build install.sh command
+  // Build install.sh command.
   $install_script = BACKDROP_ROOT . '/core/scripts/install.sh';
   $command = sprintf(
     'cd %s && php %s %s %s --root=%s --url=%s --db-url=%s --site-name=%s --account-name=%s --account-mail=%s --account-pass=%s --site-mail=%s 2>&1',
@@ -293,21 +300,20 @@ function multisite_creator_install_backdrop($site_data) {
     escapeshellarg($site_data['user1_email'])
   );
 
-  // Execute installation
+  // Execute installation.
   $output = array();
   $return_code = 0;
   exec($command, $output, $return_code);
   $output_text = implode("\n", $output);
 
-  // Log result
+  // Log result.
   if ($debug) {
     watchdog(
       'multisite_creator',
       'Install.sh output: @output, return code: @code',
-      array('@output' => $output_text, '@code' => $return_code)
+      array('@output' => $output_text, '@code' => $return_code . $command)
     );
   }
-
 
   if ($return_code === 0 && strpos($output_text, 'Backdrop installed successfully') !== FALSE) {
     return TRUE;
@@ -328,7 +334,7 @@ function multisite_creator_create_apache_config($machine_name) {
   $base_domain = $config->get('base_domain');
   $domain = $machine_name . '.' . $base_domain;
 
-  // Create log directories if enabled
+  // Create log directories if enabled.
   if ($config->get('create_log_directories')) {
     if (!multisite_creator_create_log_directories($machine_name)) {
       if ($debug) {
@@ -343,22 +349,22 @@ function multisite_creator_create_apache_config($machine_name) {
     }
   }
 
-  // Replace variables in template
+  // Replace variables in template.
   $apache_config = str_replace('{MACHINE_NAME}', $machine_name, $template);
   $apache_config = str_replace('{DOMAIN}', $domain, $apache_config);
 
-  // Write configuration using temporary file
+  // Write configuration using temporary file.
   $path = $config->get('apache_config_path');
   $config_file = $path . '/' . $apache_config_prefix . $machine_name . '.conf';
   $temp_file = '/tmp/apache_' . $machine_name . '.conf';
 
   try {
-    // Write to temporary file first
+    // Write to temporary file first.
     if (file_put_contents($temp_file, $apache_config) === FALSE) {
       throw new Exception('Could not create temporary file');
     }
 
-    // Copy with sudo to final directory
+    // Copy with sudo to final directory.
     $copy_command = sprintf(
       'sudo cp %s %s',
       escapeshellarg($temp_file),
@@ -384,7 +390,7 @@ function multisite_creator_create_apache_config($machine_name) {
         WATCHDOG_INFO
       );
     }
-    // Clean up temporary file
+    // Clean up temporary file.
     unlink($temp_file);
 
     if ($return_code !== 0) {
@@ -404,7 +410,7 @@ function multisite_creator_create_apache_config($machine_name) {
 
   // Enable the site
   // TODO: if log directories are created in config, they must be created before
-  // restarting apache, otherwise it gives error
+  // restarting apache, otherwise it gives error.
   $command = $config->get('apache_ensite_command');
   if (!empty($command)) {
     $command = $command . ' ' . escapeshellarg($apache_config_prefix . $machine_name . '.conf');
@@ -505,11 +511,11 @@ function multisite_creator_create_log_directories($machine_name) {
     return FALSE;
   }
 
-  // Replace variables in directory name
+  // Replace variables in directory name.
   $log_dir_name = str_replace('{MACHINE_NAME}', $machine_name, $log_dir_template);
   $full_log_path = rtrim($log_path, '/') . '/' . $log_dir_name;
 
-  // Create directory
+  // Create directory.
   $mkdir_command = sprintf(
     'mkdir %s',
     escapeshellarg($full_log_path)
@@ -541,28 +547,6 @@ function multisite_creator_create_log_directories($machine_name) {
     return FALSE;
   }
 
-  // Set proper permissions (readable/writable by www-data)
-  // is this needed? tehn we need to collect user apache is runing as.
-  // $chmod_command = sprintf(
-  //   'sudo chown -R www-data:www-data %s && sudo chmod -R 755 %s',
-  //   escapeshellarg($full_log_path),
-  //   escapeshellarg($full_log_path)
-  // );
-
-  // exec($chmod_command . ' 2>&1', $output, $return_code);
-
-  // if ($return_code !== 0) {
-  //   if ($debug) {
-  //     watchdog(
-  //       'multisite_creator',
-  //       'Error setting permissions on log directory @path: @error',
-  //       array('@path' => $full_log_path, '@error' => implode(' ', $output)),
-  //       WATCHDOG_ERROR
-  //     );
-  //   }
-  //   return FALSE;
-  // }
-
   if ($debug) {
     watchdog(
       'multisite_creator',
@@ -584,7 +568,7 @@ function multisite_creator_delete_log_directories($machine_name) {
   $log_path = $config->get('apache_log_path');
   $log_dir_template = $config->get('log_directory_template') ?: '{MACHINE_NAME}';
 
-  // Replace variables in directory name
+  // Replace variables in directory name.
   $log_dir_name = str_replace('{MACHINE_NAME}', $machine_name, $log_dir_template);
   $full_log_path = rtrim($log_path, '/') . '/' . $log_dir_name;
 
